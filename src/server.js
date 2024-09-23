@@ -19,8 +19,8 @@ const calculateDiscount = (fullPrice, offeredPrice) => {
 const formatLevel = (level) => {
   const levels = {
     bacharelado: 'Graduação (bacharelado)',
-    tecnologo: 'Graduação (tecnólogo) ',
-    licenciatura: 'Graduação (licenciatura)'
+    tecnologo: 'Graduação (tecnólogo)',
+    licenciatura: 'Graduação (licenciatura)',
   };
   return levels[level] || level;
 };
@@ -29,7 +29,7 @@ const formatLevel = (level) => {
 const formatModalidade = (modalidade) => {
   const modalidades = {
     presencial: 'Presencial',
-    ead: 'EaD'
+    ead: 'EaD',
   };
   return modalidades[modalidade] || modalidade;
 };
@@ -39,7 +39,7 @@ const getOffers = () => {
   try {
     const data = fs.readFileSync('data.json', 'utf-8');
     const parsedData = JSON.parse(data);
-    return parsedData.offers || []; // Acessa a chave "offers"
+    return parsedData.offers || [];
   } catch (err) {
     console.error('Erro ao ler o arquivo data.json:', err);
     return [];
@@ -48,21 +48,55 @@ const getOffers = () => {
 
 // Endpoint para listar todas as ofertas
 app.get('/api/scholarships', (req, res) => {
-  const offers = getOffers().map(offer => {
+  const offers = getOffers().map((offer) => {
     return {
-      curso: offer.courseName, // Alterado para courseName
-      instituicao: offer.iesName, // Alterado para iesName
-      modalidade: formatModalidade(offer.kind), // Alterado para kind
+      curso: offer.courseName,
+      instituicao: offer.iesName,
+      modalidade: formatModalidade(offer.kind),
       level: formatLevel(offer.level),
       fullPrice: formatCurrency(offer.fullPrice),
       offeredPrice: formatCurrency(offer.offeredPrice),
       desconto: calculateDiscount(offer.fullPrice, offer.offeredPrice),
-      rating: offer.rating, // Incluído rating
-      logo: offer.iesLogo // Incluído iesLogo
+      rating: offer.rating,
+      logo: offer.iesLogo,
     };
   });
 
   res.json(offers);
+});
+
+// Endpoint para filtrar ofertas
+app.get('/api/scholarships/filter', (req, res) => {
+  const kind = req.query.kind;
+  const level = req.query.level;
+
+  const offers = getOffers().map((offer) => {
+    return {
+      ...offer,
+      modalidade: formatModalidade(offer.kind),
+      level: formatLevel(offer.level),
+      fullPrice: formatCurrency(offer.fullPrice),
+      offeredPrice: formatCurrency(offer.offeredPrice),
+      desconto: calculateDiscount(offer.fullPrice, offer.offeredPrice),
+    };
+  });
+
+  // Se nenhum parâmetro for fornecido, retornar erro
+  if (!kind && !level) {
+    return res.status(400).json({ error: 'Por favor, forneça pelo menos uma modalidade ou nível.' });
+  }
+
+  const filteredOffers = offers.filter((offer) => {
+    const kindMatch = kind ? offer.kind === kind : true;
+    const levelMatch = level ? offer.level === level : true;
+    return kindMatch && levelMatch;
+  });
+
+  if (filteredOffers.length === 0) {
+    return res.status(404).json({ message: 'Nenhuma bolsa encontrada para os critérios especificados.' });
+  }
+
+  res.json(filteredOffers);
 });
 
 // Iniciar servidor
